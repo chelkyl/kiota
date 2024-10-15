@@ -261,6 +261,11 @@ public static partial class StringExtensions
             result = string.Concat("minus_", result.AsSpan(1));
         }
 
+        if (result.StartsWith("{+", StringComparison.OrdinalIgnoreCase))
+        {
+            result = result.Remove(1, 1);
+        }
+
         if (result.Contains('+', StringComparison.OrdinalIgnoreCase))
         {
             result = result.Replace("+", "_plus_", StringComparison.OrdinalIgnoreCase);
