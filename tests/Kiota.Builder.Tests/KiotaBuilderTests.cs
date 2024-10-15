@@ -7586,6 +7586,60 @@ paths:
         Assert.Equal("int64", select.Type.Name);
     }
     [Fact]
+    public async Task CleanupSymbolNamePreservesUriTemplate0LevelTwoOperatorsInPathParametersAsync()
+    {
+        var tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetTempFileName());
+        await using var fs = await GetDocumentStreamAsync(@"openapi: 3.0.1
+info:
+  title: Example
+  description: Example
+  version: 1.0.1
+servers:
+  - url: https://example.org
+paths:
+  /messages/{+foo}:
+    get:
+      parameters:
+        - name: foo
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+  /authors/{#bar}:
+    get:
+      parameters:
+        - name: bar
+          in: path
+          schema:
+            type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string");
+        var mockLogger = new Mock<ILogger<KiotaBuilder>>();
+        var builder = new KiotaBuilder(mockLogger.Object, new GenerationConfiguration { ClientClassName = "Graph", OpenAPIFilePath = tempFilePath, IncludeAdditionalData = false }, _httpClient);
+        var document = await builder.CreateOpenApiDocumentAsync(fs);
+        var node = builder.CreateUriSpace(document);
+        var codeModel = builder.CreateSourceModel(node);
+        var messagesNamespace = codeModel.FindNamespaceByName("ApiSdk.messages.item");
+        Assert.NotNull(messagesNamespace);
+        var messagesFooItemUrlTemplate = messagesNamespace.FindChildByName<CodeProperty>("urlTemplate");
+        Assert.NotNull(messagesFooItemUrlTemplate);
+        Assert.Equal("\"{+baseurl}/messages/{+foo}\"", messagesFooItemUrlTemplate.DefaultValue);
+        var authorsNamespace = codeModel.FindNamespaceByName("ApiSdk.authors.item");
+        Assert.NotNull(authorsNamespace);
+        var authorsBarItemUrlTemplate = authorsNamespace.FindChildByName<CodeProperty>("urlTemplate");
+        Assert.NotNull(authorsBarItemUrlTemplate);
+        Assert.Equal("\"{+baseurl}/authors/{#bar}\"", authorsBarItemUrlTemplate.DefaultValue);
+    }
+    [Fact]
     public async Task SupportsMultiPartFormAsRequestBodyWithDefaultMimeTypesAsync()
     {
         var tempFilePath = Path.Combine(Path.GetTempPath(), Path.GetTempFileName());

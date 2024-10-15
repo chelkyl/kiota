@@ -42,7 +42,7 @@ public static partial class OpenApiUrlTreeNodeExtensions
         return currentNode.Path.GetNamespaceFromPath(prefix);
     }
     //{id}, name(idParam={id}), name(idParam='{id}'), name(idParam='{id}',idParam2='{id2}')
-    [GeneratedRegex(@"(?<prefix>\w+)?(?<equals>=?)'?\{(?<paramName>\w+)\}'?,?", RegexOptions.Singleline, 500)]
+    [GeneratedRegex(@"(?<prefix>\w+)?(?<equals>=?)'?\{(?:\+|#)?(?<paramName>\w+)\}'?,?", RegexOptions.Singleline, 500)]
     private static partial Regex PathParametersRegex();
     // microsoft.graph.getRoleScopeTagsByIds(ids=@ids)
     [GeneratedRegex(@"=@(\w+)", RegexOptions.Singleline, 500)]
@@ -261,7 +261,7 @@ public static partial class OpenApiUrlTreeNodeExtensions
             yield return new KeyValuePair<string, HashSet<string>>(currentNode.GetUrlTemplate(null, false, false).TrimStart('/'), operations.Select(static x => x.Key.ToString().ToUpperInvariant()).ToHashSet(StringComparer.OrdinalIgnoreCase));
         }
     }
-    [GeneratedRegex(@"{(?<paramname>[^}]+)}", RegexOptions.Singleline, 500)]
+    [GeneratedRegex(@"{(?<operator>\+|#)?(?<paramname>[^}]+)}", RegexOptions.Singleline, 500)]
     private static partial Regex pathParamMatcher();
     private static string SanitizePathParameterNamesForUrlTemplate(string original, HashSet<string> reservedParameterNames)
     {
@@ -274,13 +274,25 @@ public static partial class OpenApiUrlTreeNodeExtensions
     public static string SanitizeParameterNameForUrlTemplate(this string original)
     {
         if (string.IsNullOrEmpty(original)) return original;
-        return Uri.EscapeDataString(stripExtensionForIndexersRegex()
-                                        .Replace(original, string.Empty) // {param-name}.json becomes {param-name}
-                                .TrimStart('{')
-                                .TrimEnd('}'))
-                    .Replace("-", "%2D", StringComparison.OrdinalIgnoreCase)
-                    .Replace(".", "%2E", StringComparison.OrdinalIgnoreCase)
-                    .Replace("~", "%7E", StringComparison.OrdinalIgnoreCase);// - . ~ are invalid uri template character but don't get encoded by Uri.EscapeDataString
+        var parameter = pathParamMatcher().Match(stripExtensionForIndexersRegex()
+                                                    .Replace(original, string.Empty)); // {param-name}.json becomes {param-name}
+        original = Uri.EscapeDataString(parameter.Success ? parameter.Groups["paramname"].Value : original)
+                        // - . ~ are invalid uri template character but don't get encoded by Uri.EscapeDataString
+                        .Replace("-", "%2D", StringComparison.OrdinalIgnoreCase)
+                        .Replace(".", "%2E", StringComparison.OrdinalIgnoreCase)
+                        .Replace("~", "%7E", StringComparison.OrdinalIgnoreCase);
+        return parameter.Success ? parameter.Groups["operator"].Value + original : original;
+    }
+    public static string SanitizeParameterNameForSerialization(this string original)
+    {
+        if (string.IsNullOrEmpty(original)) return original;
+        var parameter = pathParamMatcher().Match(stripExtensionForIndexersRegex()
+                                                    .Replace(original, string.Empty)); // {param-name}.json becomes {param-name}
+        return Uri.EscapeDataString(parameter.Success ? parameter.Groups["paramname"].Value : original)
+                        // - . ~ are invalid uri template character but don't get encoded by Uri.EscapeDataString
+                        .Replace("-", "%2D", StringComparison.OrdinalIgnoreCase)
+                        .Replace(".", "%2E", StringComparison.OrdinalIgnoreCase)
+                        .Replace("~", "%7E", StringComparison.OrdinalIgnoreCase);
     }
     public static string DeSanitizeUrlTemplateParameter(this string original)
     {

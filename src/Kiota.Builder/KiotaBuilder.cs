@@ -1026,7 +1026,7 @@ public partial class KiotaBuilder
         var result = new CodeParameter
         {
             Type = type,
-            SerializationName = segment.SanitizeParameterNameForUrlTemplate(),
+            SerializationName = segment.SanitizeParameterNameForSerialization(),
             Name = segment.CleanupSymbolName(),
             Documentation = new()
             {
